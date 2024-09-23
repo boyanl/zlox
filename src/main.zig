@@ -1,29 +1,33 @@
 const std = @import("std");
 const c = @import("common.zig");
+const vm = @import("vm.zig");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
     var chunk = c.Chunk.init(allocator);
     defer chunk.deinit();
 
-    try chunk.write(@intFromEnum(c.InstructionType.OP_RETURN), 123);
-
-    const const_idx = try chunk.addConstant(1.2);
+    var const_idx = try chunk.addConstant(1.2);
     try chunk.write(@intFromEnum(c.InstructionType.OP_CONSTANT), 123);
     try chunk.write(@intCast(const_idx), 123);
+
+    const_idx = try chunk.addConstant(3.4);
+    try chunk.write(@intFromEnum(c.InstructionType.OP_CONSTANT), 123);
+    try chunk.write(@intCast(const_idx), 123);
+
+    try chunk.write(@intFromEnum(c.InstructionType.OP_ADD), 123);
+
+    const_idx = try chunk.addConstant(5.6);
+    try chunk.write(@intFromEnum(c.InstructionType.OP_CONSTANT), 123);
+    try chunk.write(@intCast(const_idx), 123);
+
+    try chunk.write(@intFromEnum(c.InstructionType.OP_DIVIDE), 123);
+    try chunk.write(@intFromEnum(c.InstructionType.OP_NEGATE), 123);
     try chunk.write(@intFromEnum(c.InstructionType.OP_RETURN), 124);
 
-    chunk.disassemble("test chunk");
-    // // stdout is for the actual output of your application, for example if you
-    // // are implementing gzip, then only the compressed bytes should be sent to
-    // // stdout, not any debugging messages.
-    // const stdout_file = std.io.getStdOut().writer();
-    // var bw = std.io.bufferedWriter(stdout_file);
-    // const stdout = bw.writer();
+    _ = vm.interpret(&chunk);
 
-    // try stdout.print("Run `zig build test` to run the tests.\n", .{});
-
-    // try bw.flush(); // don't forget to flush!
+    // chunk.disassemble("test chunk");
 }
 
 test "simple test" {

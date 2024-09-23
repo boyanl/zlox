@@ -2,7 +2,7 @@ const std = @import("std");
 const vals = @import("values.zig");
 const assert = std.debug.assert;
 
-pub const InstructionType = enum(u8) { OP_CONSTANT, OP_RETURN };
+pub const InstructionType = enum(u8) { OP_CONSTANT, OP_RETURN, OP_NEGATE, OP_ADD, OP_SUBTRACT, OP_MULTIPLY, OP_DIVIDE };
 pub const LineNumber = u24;
 pub const LineRun = packed struct { cnt: u8, line: LineNumber };
 pub const Chunk = struct {
@@ -64,7 +64,9 @@ pub const Chunk = struct {
     }
 };
 
-fn disassembleInstruction(chunk: Chunk, offset: usize) usize {
+pub const DEBUG = true;
+
+pub fn disassembleInstruction(chunk: Chunk, offset: usize) usize {
     std.debug.print("{d:0>4} ", .{offset});
     const lineNow = chunk.getLine(offset);
     if (offset > 0 and chunk.getLine(offset - 1) == lineNow) {
@@ -76,6 +78,11 @@ fn disassembleInstruction(chunk: Chunk, offset: usize) usize {
     return switch (t) {
         .OP_CONSTANT => constantInstruction("OP_CONSTANT", chunk, offset),
         .OP_RETURN => simpleInstruction("OP_RETURN", offset),
+        .OP_NEGATE => simpleInstruction("OP_NEGATE", offset),
+        .OP_ADD => simpleInstruction("OP_ADD", offset),
+        .OP_SUBTRACT => simpleInstruction("OP_SUBTRACT", offset),
+        .OP_MULTIPLY => simpleInstruction("OP_MULTIPLYl", offset),
+        .OP_DIVIDE => simpleInstruction("OP_DIVIDE", offset),
     };
 }
 
