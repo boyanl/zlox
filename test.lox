@@ -1,0 +1,5 @@
+var a = 25.3+29.2391;
+var b = "smokey";
+if (a == 4) {
+	print "Correct!";
+}
