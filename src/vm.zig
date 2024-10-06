@@ -1,6 +1,7 @@
 const std = @import("std");
 const common = @import("common.zig");
 const vals = @import("values.zig");
+const compiler = @import("compiler.zig");
 const assert = std.debug.assert;
 
 pub const InterpretResult = enum { OK, COMPILE_ERROR, RUNTIME_ERROR };
@@ -20,8 +21,13 @@ pub const VM = struct {
 
 var vm = VM.init();
 
-pub fn interpret(chunk: *common.Chunk) InterpretResult {
-    vm.chunk = chunk;
+pub fn interpret(source: []u8, allocator: std.mem.Allocator) InterpretResult {
+    var chunk = common.Chunk.init(allocator);
+    defer chunk.deinit();
+
+    if (!compiler.compile(source, &chunk)) return .COMPILE_ERROR;
+
+    vm.chunk = &chunk;
     vm.ip = 0;
     return run();
 }
@@ -37,7 +43,7 @@ fn read_constant() vals.Value {
 }
 
 fn reset_stack() void {
-    vm.stack_top = &vm.stack;
+    vm.stack_top = 0;
 }
 
 fn push(val: vals.Value) void {
@@ -51,37 +57,68 @@ fn pop() vals.Value {
     return vm.stack[vm.stack_top];
 }
 
-fn binaryOp(instr: common.InstructionType) void {
-    const b = pop();
-    const a = pop();
+fn peek(depth: usize) vals.Value {
+    assert(vm.stack_top - depth - 1 >= 0);
+    return vm.stack[vm.stack_top - depth - 1];
+}
+
+fn runtime_error(comptime fmt: []const u8, args: anytype) void {
+    std.debug.print(fmt, args);
+    std.debug.print("\n", .{});
+
+    const instr = vm.ip - 1;
+    const line = vm.chunk.?.get_line(instr);
+    std.debug.print("[line {d}] in script", .{line});
+    reset_stack();
+}
+
+fn binary_op(instr: common.InstructionType) InterpretResult {
+    if (!vals.is_number(peek(0)) or !vals.is_number(peek(1))) {
+        runtime_error("Operands must be numbers", .{});
+        return .RUNTIME_ERROR;
+    }
+
+    const b = pop().number;
+    const a = pop().number;
     switch (instr) {
-        .OP_ADD => push(a + b),
-        .OP_SUBTRACT => push(a - b),
-        .OP_MULTIPLY => push(a * b),
-        .OP_DIVIDE => push(a / b),
+        .OP_ADD => push(vals.Value{ .number = a + b }),
+        .OP_SUBTRACT => push(vals.Value{ .number = a - b }),
+        .OP_MULTIPLY => push(vals.Value{ .number = a * b }),
+        .OP_DIVIDE => push(vals.Value{ .number = a / b }),
         else => undefined,
     }
+
+    return .OK;
 }
 
 pub fn run() InterpretResult {
     while (true) {
         if (common.DEBUG) {
-            _ = common.disassembleInstruction(vm.chunk.?.*, vm.ip);
+            _ = common.disassemble_instruction(vm.chunk.?.*, vm.ip);
         }
 
         const instruction: common.InstructionType = @enumFromInt(read_byte());
         switch (instruction) {
             .OP_RETURN => {
                 vals.printValue(pop());
+                std.debug.print("\n", .{});
                 return .OK;
             },
             .OP_CONSTANT => {
                 push(read_constant());
             },
             .OP_NEGATE => {
-                push(-pop());
+                if (!vals.is_number(peek(0))) {
+                    runtime_error("Operand must be a number", .{});
+                    return .RUNTIME_ERROR;
+                }
+                push(vals.Value{ .number = -vals.as_number(pop()) });
             },
-            .OP_ADD, .OP_SUBTRACT, .OP_MULTIPLY, .OP_DIVIDE => binaryOp(instruction),
+            .OP_ADD, .OP_SUBTRACT, .OP_MULTIPLY, .OP_DIVIDE => {
+                if (binary_op(instruction) == .RUNTIME_ERROR) {
+                    return .RUNTIME_ERROR;
+                }
+            },
         }
     }
 }

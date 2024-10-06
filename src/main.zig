@@ -9,7 +9,7 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
 
     if (args.len == 1) {
-        try repl();
+        try repl(allocator);
     } else if (args.len == 2) {
         try runFile(args[1], allocator);
     } else {
@@ -17,7 +17,7 @@ pub fn main() !void {
     }
 }
 
-fn repl() !void {
+fn repl(allocator: std.mem.Allocator) !void {
     const stdout = std.io.getStdOut().writer();
 
     const in = std.io.getStdIn().reader();
@@ -30,7 +30,7 @@ fn repl() !void {
         const line_opt = try stdin.readUntilDelimiterOrEof(&buf, '\n');
 
         if (line_opt) |line| {
-            _ = interpret(line);
+            _ = vm.interpret(line, allocator);
         } else {
             break;
         }
@@ -50,12 +50,5 @@ fn runFile(filename: []u8, allocator: std.mem.Allocator) !void {
         // ??
     }
 
-    _ = interpret(buffer);
-}
-
-fn interpret(source: []u8) vm.InterpretResult {
-    std.debug.print("Interpreting {s}\n", .{source});
-    compiler.compile(source);
-
-    return .OK;
+    _ = vm.interpret(buffer, allocator);
 }

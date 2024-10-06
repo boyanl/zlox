@@ -25,7 +25,7 @@ pub const Chunk = struct {
 
         var offset: usize = 0;
         while (offset < self.code.items.len) {
-            offset = disassembleInstruction(self, offset);
+            offset = disassemble_instruction(self, offset);
         }
     }
 
@@ -42,12 +42,14 @@ pub const Chunk = struct {
         try self.*.lines.append(LineRun{ .cnt = 1, .line = line });
     }
 
-    pub fn addConstant(self: *Chunk, val: vals.Value) !usize {
-        try self.*.constants.append(val);
+    pub fn add_constant(self: *Chunk, val: vals.Value) usize {
+        self.*.constants.append(val) catch {
+            std.debug.print("Snafu - can't append to constants in chunk", .{});
+        };
         return self.*.constants.items.len - 1;
     }
 
-    pub fn getLine(self: Chunk, offset: usize) u24 {
+    pub fn get_line(self: Chunk, offset: usize) u24 {
         assert(offset < self.code.items.len);
 
         var remaining = offset;
@@ -66,27 +68,27 @@ pub const Chunk = struct {
 
 pub const DEBUG = true;
 
-pub fn disassembleInstruction(chunk: Chunk, offset: usize) usize {
+pub fn disassemble_instruction(chunk: Chunk, offset: usize) usize {
     std.debug.print("{d:0>4} ", .{offset});
-    const lineNow = chunk.getLine(offset);
-    if (offset > 0 and chunk.getLine(offset - 1) == lineNow) {
+    const lineNow = chunk.get_line(offset);
+    if (offset > 0 and chunk.get_line(offset - 1) == lineNow) {
         std.debug.print("   | ", .{});
     } else {
         std.debug.print("{d:>4} ", .{lineNow});
     }
     const t: InstructionType = @enumFromInt(chunk.code.items[offset]);
     return switch (t) {
-        .OP_CONSTANT => constantInstruction("OP_CONSTANT", chunk, offset),
-        .OP_RETURN => simpleInstruction("OP_RETURN", offset),
-        .OP_NEGATE => simpleInstruction("OP_NEGATE", offset),
-        .OP_ADD => simpleInstruction("OP_ADD", offset),
-        .OP_SUBTRACT => simpleInstruction("OP_SUBTRACT", offset),
-        .OP_MULTIPLY => simpleInstruction("OP_MULTIPLYl", offset),
-        .OP_DIVIDE => simpleInstruction("OP_DIVIDE", offset),
+        .OP_CONSTANT => constant_instruction("OP_CONSTANT", chunk, offset),
+        .OP_RETURN => simple_instruction("OP_RETURN", offset),
+        .OP_NEGATE => simple_instruction("OP_NEGATE", offset),
+        .OP_ADD => simple_instruction("OP_ADD", offset),
+        .OP_SUBTRACT => simple_instruction("OP_SUBTRACT", offset),
+        .OP_MULTIPLY => simple_instruction("OP_MULTIPLY", offset),
+        .OP_DIVIDE => simple_instruction("OP_DIVIDE", offset),
     };
 }
 
-fn constantInstruction(name: []const u8, chunk: Chunk, offset: usize) usize {
+fn constant_instruction(name: []const u8, chunk: Chunk, offset: usize) usize {
     const const_idx = chunk.code.items[offset + 1];
     std.debug.print("{s:<16} {d:>4} '", .{ name, const_idx });
     vals.printValue(chunk.constants.items[const_idx]);
@@ -95,7 +97,7 @@ fn constantInstruction(name: []const u8, chunk: Chunk, offset: usize) usize {
     return offset + 2;
 }
 
-fn simpleInstruction(name: []const u8, offset: usize) usize {
+fn simple_instruction(name: []const u8, offset: usize) usize {
     std.debug.print("{s}\n", .{name});
     return offset + 1;
 }
