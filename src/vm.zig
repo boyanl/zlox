@@ -1,6 +1,7 @@
 const std = @import("std");
 const common = @import("common.zig");
 const vals = @import("values.zig");
+const compiler = @import("compiler.zig");
 const assert = std.debug.assert;
 
 pub const InterpretResult = enum { OK, COMPILE_ERROR, RUNTIME_ERROR };
@@ -20,8 +21,13 @@ pub const VM = struct {
 
 var vm = VM.init();
 
-pub fn interpret(chunk: *common.Chunk) InterpretResult {
-    vm.chunk = chunk;
+pub fn interpret(source: []u8, allocator: std.mem.Allocator) InterpretResult {
+    var chunk = common.Chunk.init(allocator);
+    defer chunk.deinit();
+
+    if (!compiler.compile(source, &chunk)) return .COMPILE_ERROR;
+
+    vm.chunk = &chunk;
     vm.ip = 0;
     return run();
 }
@@ -51,7 +57,7 @@ fn pop() vals.Value {
     return vm.stack[vm.stack_top];
 }
 
-fn binaryOp(instr: common.InstructionType) void {
+fn binary_op(instr: common.InstructionType) void {
     const b = pop();
     const a = pop();
     switch (instr) {
@@ -66,13 +72,14 @@ fn binaryOp(instr: common.InstructionType) void {
 pub fn run() InterpretResult {
     while (true) {
         if (common.DEBUG) {
-            _ = common.disassembleInstruction(vm.chunk.?.*, vm.ip);
+            _ = common.disassemble_instruction(vm.chunk.?.*, vm.ip);
         }
 
         const instruction: common.InstructionType = @enumFromInt(read_byte());
         switch (instruction) {
             .OP_RETURN => {
                 vals.printValue(pop());
+                std.debug.print("\n", .{});
                 return .OK;
             },
             .OP_CONSTANT => {
@@ -81,7 +88,7 @@ pub fn run() InterpretResult {
             .OP_NEGATE => {
                 push(-pop());
             },
-            .OP_ADD, .OP_SUBTRACT, .OP_MULTIPLY, .OP_DIVIDE => binaryOp(instruction),
+            .OP_ADD, .OP_SUBTRACT, .OP_MULTIPLY, .OP_DIVIDE => binary_op(instruction),
         }
     }
 }

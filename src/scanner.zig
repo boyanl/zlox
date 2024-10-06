@@ -6,7 +6,49 @@ pub const Token = struct {
     lexeme: []const u8,
     line: i32,
 
-    const Type = enum { LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE, PLUS, MINUS, STAR, SLASH, COMMA, DOT, EQUAL, BANG, EQUAL_EQUAL, BANG_EQUAL, GREATER, GREATER_EQUAL, LESS, LESS_EQUAL, NUMBER, STRING, IDENTIFIER, IF, ELSE, FOR, PRINT, RETURN, WHILE, OR, AND, CLASS, FUN, NIL, THIS, SUPER, VAR, BREAK, TRUE, FALSE, SEMICOLON, EOF, ERROR };
+    pub const Type = enum(u8) {
+        LEFT_PAREN,
+        RIGHT_PAREN,
+        LEFT_BRACE,
+        RIGHT_BRACE,
+        PLUS,
+        MINUS,
+        STAR,
+        SLASH,
+        COMMA,
+        DOT,
+        EQUAL,
+        BANG,
+        EQUAL_EQUAL,
+        BANG_EQUAL,
+        GREATER,
+        GREATER_EQUAL,
+        LESS,
+        LESS_EQUAL,
+        NUMBER,
+        STRING,
+        IDENTIFIER,
+        IF,
+        ELSE,
+        FOR,
+        PRINT,
+        RETURN,
+        WHILE,
+        OR,
+        AND,
+        CLASS,
+        FUN,
+        NIL,
+        THIS,
+        SUPER,
+        VAR,
+        BREAK,
+        TRUE,
+        FALSE,
+        SEMICOLON,
+        EOF,
+        ERROR,
+    };
 };
 
 pub const Scanner = struct {
@@ -71,6 +113,8 @@ pub const Scanner = struct {
                         while (self.peek() == '/' and !self.is_at_end()) {
                             self.current += 1;
                         }
+                    } else {
+                        return;
                     }
                 },
                 else => return,
