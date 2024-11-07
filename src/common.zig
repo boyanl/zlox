@@ -2,7 +2,22 @@ const std = @import("std");
 const vals = @import("values.zig");
 const assert = std.debug.assert;
 
-pub const InstructionType = enum(u8) { OP_CONSTANT, OP_RETURN, OP_NEGATE, OP_ADD, OP_SUBTRACT, OP_MULTIPLY, OP_DIVIDE };
+pub const InstructionType = enum(u8) {
+    OP_CONSTANT,
+    OP_RETURN,
+    OP_NEGATE,
+    OP_ADD,
+    OP_SUBTRACT,
+    OP_MULTIPLY,
+    OP_DIVIDE,
+    OP_TRUE,
+    OP_FALSE,
+    OP_NIL,
+    OP_NOT,
+    OP_EQUAL,
+    OP_GREATER,
+    OP_LESS,
+};
 pub const LineNumber = u24;
 pub const LineRun = packed struct { cnt: u8, line: LineNumber };
 pub const Chunk = struct {
@@ -85,13 +100,20 @@ pub fn disassemble_instruction(chunk: Chunk, offset: usize) usize {
         .OP_SUBTRACT => simple_instruction("OP_SUBTRACT", offset),
         .OP_MULTIPLY => simple_instruction("OP_MULTIPLY", offset),
         .OP_DIVIDE => simple_instruction("OP_DIVIDE", offset),
+        .OP_TRUE => simple_instruction("OP_TRUE", offset),
+        .OP_FALSE => simple_instruction("OP_FALSE", offset),
+        .OP_NIL => simple_instruction("OP_NIL", offset),
+        .OP_NOT => simple_instruction("OP_NOT", offset),
+        .OP_EQUAL => simple_instruction("OP_EQUAL", offset),
+        .OP_GREATER => simple_instruction("OP_GREATER", offset),
+        .OP_LESS => simple_instruction("OP_LESS", offset),
     };
 }
 
 fn constant_instruction(name: []const u8, chunk: Chunk, offset: usize) usize {
     const const_idx = chunk.code.items[offset + 1];
     std.debug.print("{s:<16} {d:>4} '", .{ name, const_idx });
-    vals.printValue(chunk.constants.items[const_idx]);
+    vals.print_value(chunk.constants.items[const_idx]);
     std.debug.print("'\n", .{});
 
     return offset + 2;

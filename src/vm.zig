@@ -85,10 +85,20 @@ fn binary_op(instr: common.InstructionType) InterpretResult {
         .OP_SUBTRACT => push(vals.Value{ .number = a - b }),
         .OP_MULTIPLY => push(vals.Value{ .number = a * b }),
         .OP_DIVIDE => push(vals.Value{ .number = a / b }),
+        .OP_GREATER => push(.{ .boolean = a > b }),
+        .OP_LESS => push(.{ .boolean = a < b }),
         else => undefined,
     }
 
     return .OK;
+}
+
+pub fn is_falsey(v: vals.Value) bool {
+    return switch (v) {
+        .nil => true,
+        .boolean => v.boolean == false,
+        else => false,
+    };
 }
 
 pub fn run() InterpretResult {
@@ -100,7 +110,7 @@ pub fn run() InterpretResult {
         const instruction: common.InstructionType = @enumFromInt(read_byte());
         switch (instruction) {
             .OP_RETURN => {
-                vals.printValue(pop());
+                vals.print_value(pop());
                 std.debug.print("\n", .{});
                 return .OK;
             },
@@ -114,10 +124,20 @@ pub fn run() InterpretResult {
                 }
                 push(vals.Value{ .number = -vals.as_number(pop()) });
             },
-            .OP_ADD, .OP_SUBTRACT, .OP_MULTIPLY, .OP_DIVIDE => {
+            .OP_ADD, .OP_SUBTRACT, .OP_MULTIPLY, .OP_DIVIDE, .OP_GREATER, .OP_LESS => {
                 if (binary_op(instruction) == .RUNTIME_ERROR) {
                     return .RUNTIME_ERROR;
                 }
+            },
+            .OP_TRUE => push(.{ .boolean = true }),
+            .OP_FALSE => push(.{ .boolean = false }),
+            .OP_NIL => push(.nil),
+            .OP_NOT => push(.{ .boolean = is_falsey(pop()) }),
+
+            .OP_EQUAL => {
+                const b = pop();
+                const a = pop();
+                push(.{ .boolean = vals.values_equal(a, b) });
             },
         }
     }

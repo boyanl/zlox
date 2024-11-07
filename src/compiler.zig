@@ -87,6 +87,7 @@ fn unary() void {
 
     switch (opType) {
         .MINUS => emit_instruction(.OP_NEGATE),
+        .BANG => emit_instruction(.OP_NOT),
         else => unreachable,
     }
 }
@@ -102,6 +103,22 @@ fn binary() void {
         .MINUS => emit_instruction(.OP_SUBTRACT),
         .STAR => emit_instruction(.OP_MULTIPLY),
         .SLASH => emit_instruction(.OP_DIVIDE),
+        .EQUAL_EQUAL => emit_instruction(.OP_EQUAL),
+        .BANG_EQUAL => emit_instructions(.OP_EQUAL, .OP_NOT),
+        .GREATER => emit_instruction(.OP_GREATER),
+        .GREATER_EQUAL => emit_instructions(.OP_LESS, .OP_NOT),
+        .LESS => emit_instruction(.OP_LESS),
+        .LESS_EQUAL => emit_instructions(.OP_GREATER, .OP_NOT),
+
+        else => unreachable,
+    }
+}
+
+fn literal() void {
+    switch (parser.previous.type) {
+        .TRUE => emit_instruction(.OP_TRUE),
+        .FALSE => emit_instruction(.OP_FALSE),
+        .NIL => emit_instruction(.OP_NIL),
         else => unreachable,
     }
 }
@@ -117,6 +134,16 @@ const rules = init: {
     arr[@intFromEnum(t.SLASH)] = .{ .prefix = null, .infix = binary, .precedence = .FACTOR };
     arr[@intFromEnum(t.STAR)] = .{ .prefix = null, .infix = binary, .precedence = .FACTOR };
     arr[@intFromEnum(t.NUMBER)] = .{ .prefix = number, .infix = null, .precedence = .NONE };
+    arr[@intFromEnum(t.TRUE)] = .{ .prefix = literal, .infix = null, .precedence = .NONE };
+    arr[@intFromEnum(t.FALSE)] = .{ .prefix = literal, .infix = null, .precedence = .NONE };
+    arr[@intFromEnum(t.NIL)] = .{ .prefix = literal, .infix = null, .precedence = .NONE };
+    arr[@intFromEnum(t.BANG)] = .{ .prefix = unary, .infix = null, .precedence = .NONE };
+    arr[@intFromEnum(t.EQUAL_EQUAL)] = .{ .prefix = null, .infix = binary, .precedence = .EQUALITY };
+    arr[@intFromEnum(t.BANG_EQUAL)] = .{ .prefix = null, .infix = binary, .precedence = .EQUALITY };
+    arr[@intFromEnum(t.GREATER)] = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON };
+    arr[@intFromEnum(t.GREATER_EQUAL)] = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON };
+    arr[@intFromEnum(t.LESS)] = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON };
+    arr[@intFromEnum(t.LESS_EQUAL)] = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON };
 
     break :init arr;
 };
@@ -203,6 +230,11 @@ fn emit_bytes(b1: u8, b2: u8) void {
 
 fn emit_instruction(t: common.InstructionType) void {
     emit_byte(@intFromEnum(t));
+}
+
+fn emit_instructions(t1: common.InstructionType, t2: common.InstructionType) void {
+    emit_instruction(t1);
+    emit_instruction(t2);
 }
 
 fn emit_constant(v: vals.Value) void {
