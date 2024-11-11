@@ -1,4 +1,5 @@
 const std = @import("std");
+const objects = @import("object.zig");
 
 pub const Number = f64;
 const ValueType = enum { number, boolean, nil };
@@ -42,7 +43,7 @@ fn value_type(v: Value) ValueType {
 }
 
 pub fn values_equal(v1: Value, v2: Value) bool {
-    if (value_type(v1) != value_type(v2)) return false;
+    if (@as(ValueType, v1) != @as(ValueType, v2)) return false;
 
     return switch (v1) {
         .boolean => as_bool(v1) == as_bool(v2),

@@ -1,7 +1,7 @@
 const std = @import("std");
 const c = @import("common.zig");
 const compiler = @import("compiler.zig");
-const vm = @import("vm.zig");
+const VM = @import("vm.zig").VM;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -23,6 +23,8 @@ fn repl(allocator: std.mem.Allocator) !void {
     const in = std.io.getStdIn().reader();
     var br = std.io.bufferedReader(in);
     const stdin = br.reader();
+    var vm = VM.init(allocator);
+    defer vm.deinit();
 
     while (true) {
         try stdout.print(" > ", .{});
@@ -45,6 +47,9 @@ fn runFile(filename: []u8, allocator: std.mem.Allocator) !void {
     var br = std.io.bufferedReader(file.reader());
     const buffer = try allocator.alloc(u8, size);
     const read = try br.read(buffer);
+
+    var vm = VM.init(allocator);
+    defer vm.deinit();
 
     if (read < size) {
         // ??
