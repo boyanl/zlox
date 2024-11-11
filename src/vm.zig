@@ -1,7 +1,7 @@
 const std = @import("std");
 const common = @import("common.zig");
 const vals = @import("values.zig");
-const compiler = @import("compiler.zig");
+const Compiler = @import("compiler.zig").Compiler;
 const assert = std.debug.assert;
 
 pub const InterpretResult = enum { OK, COMPILE_ERROR, RUNTIME_ERROR };
@@ -22,6 +22,8 @@ pub const VM = struct {
     pub fn interpret(self: *VM, source: []u8, allocator: std.mem.Allocator) InterpretResult {
         var chunk = common.Chunk.init(allocator);
         defer chunk.deinit();
+
+        var compiler = Compiler.init(self.allocator);
 
         if (!compiler.compile(source, &chunk)) return .COMPILE_ERROR;
 
