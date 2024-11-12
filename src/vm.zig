@@ -1,6 +1,7 @@
 const std = @import("std");
 const common = @import("common.zig");
 const vals = @import("values.zig");
+const obj = @import("object.zig");
 const Compiler = @import("compiler.zig").Compiler;
 const assert = std.debug.assert;
 
@@ -72,7 +73,7 @@ pub const VM = struct {
         self.reset_stack();
     }
 
-    fn binary_op(self: *VM, instr: common.InstructionType) InterpretResult {
+    fn binary_numeric_op(self: *VM, instr: common.InstructionType) InterpretResult {
         if (!vals.is_number(self.peek(0)) or !vals.is_number(self.peek(1))) {
             self.runtime_error("Operands must be numbers", .{});
             return .RUNTIME_ERROR;
@@ -91,6 +92,18 @@ pub const VM = struct {
         }
 
         return .OK;
+    }
+
+    fn concatenate(self: *VM) void {
+        const s2 = self.pop().obj.as_string();
+        const s1 = self.pop().obj.as_string();
+        var s = self.allocator.alloc(u8, s1.str.len + s2.str.len) catch return;
+
+        std.mem.copyForwards(u8, s, s1.str);
+        std.mem.copyForwards(u8, s[s1.str.len..], s2.str);
+
+        const res = obj.take_string(s, self.allocator) catch return;
+        self.push(.{ .obj = res.as_obj() });
     }
 
     pub fn is_falsey(v: vals.Value) bool {
@@ -124,8 +137,20 @@ pub const VM = struct {
                     }
                     self.push(vals.Value{ .number = -vals.as_number(self.pop()) });
                 },
-                .OP_ADD, .OP_SUBTRACT, .OP_MULTIPLY, .OP_DIVIDE, .OP_GREATER, .OP_LESS => {
-                    if (self.binary_op(instruction) == .RUNTIME_ERROR) {
+                .OP_ADD => {
+                    if (vals.is_string(self.peek(0)) and vals.is_string(self.peek(1))) {
+                        self.concatenate();
+                    } else if (vals.is_number(self.peek(0)) and vals.is_number(self.peek(1))) {
+                        const b = self.pop().number;
+                        const a = self.pop().number;
+                        self.push(vals.Value{ .number = a + b });
+                    } else {
+                        self.runtime_error("Operands must be either numbers or strings", .{});
+                        return .RUNTIME_ERROR;
+                    }
+                },
+                .OP_SUBTRACT, .OP_MULTIPLY, .OP_DIVIDE, .OP_GREATER, .OP_LESS => {
+                    if (self.binary_numeric_op(instruction) == .RUNTIME_ERROR) {
                         return .RUNTIME_ERROR;
                     }
                 },
