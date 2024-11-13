@@ -3,6 +3,7 @@ const common = @import("common.zig");
 const s = @import("scanner.zig");
 const vals = @import("values.zig");
 const objs = @import("object.zig");
+const VM = @import("vm.zig").VM;
 
 // TODO: Can we do better than leaving those undefined and initializing them later?
 const Parser = struct {
@@ -69,9 +70,10 @@ pub const Compiler = struct {
     current_chunk: ?*common.Chunk = null,
     parser: Parser,
     allocator: std.mem.Allocator,
+    vm: *VM,
 
-    pub fn init(allocator: std.mem.Allocator) Compiler {
-        return .{ .parser = .{}, .allocator = allocator };
+    pub fn init(vm: *VM, allocator: std.mem.Allocator) Compiler {
+        return .{ .parser = .{}, .vm = vm, .allocator = allocator };
     }
 
     pub fn compile(self: *Compiler, source: []u8, chunk: *common.Chunk) bool {
@@ -162,7 +164,7 @@ pub const Compiler = struct {
 
     fn string(self: *Compiler) void {
         const source = self.parser.previous.lexeme[1 .. self.parser.previous.lexeme.len - 1];
-        const str = objs.copy_string(source, self.allocator) catch null; // TODO: Handle allocation errors?
+        const str = objs.copy_string(source, self.vm) catch null; // TODO: Handle allocation errors?
         self.emit_constant(vals.Value{ .obj = str.?.as_obj() });
     }
 

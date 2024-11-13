@@ -14,17 +14,25 @@ pub const VM = struct {
     stack: [STACK_MAX]vals.Value = [_]vals.Value{undefined} ** STACK_MAX,
     stack_top: usize = 0, // TODO: Tried to use a pointer here but it gets copied when init() returns and points to an invalid address ..
     allocator: std.mem.Allocator,
+    objects: ?*obj.Obj = null,
 
     pub fn init(allocator: std.mem.Allocator) VM {
         return VM{ .allocator = allocator };
     }
-    pub fn deinit(_: *VM) void {}
+    pub fn deinit(self: *VM) void {
+        var current = self.objects;
+        while (current != null) {
+            const next = current.?.next;
+            current.?.deinit(self);
+            current = next;
+        }
+    }
 
     pub fn interpret(self: *VM, source: []u8, allocator: std.mem.Allocator) InterpretResult {
         var chunk = common.Chunk.init(allocator);
         defer chunk.deinit();
 
-        var compiler = Compiler.init(self.allocator);
+        var compiler = Compiler.init(self, self.allocator);
 
         if (!compiler.compile(source, &chunk)) return .COMPILE_ERROR;
 
@@ -102,7 +110,7 @@ pub const VM = struct {
         std.mem.copyForwards(u8, s, s1.str);
         std.mem.copyForwards(u8, s[s1.str.len..], s2.str);
 
-        const res = obj.take_string(s, self.allocator) catch return;
+        const res = obj.take_string(s, self) catch return;
         self.push(.{ .obj = res.as_obj() });
     }
 
