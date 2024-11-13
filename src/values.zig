@@ -2,22 +2,16 @@ const std = @import("std");
 const objects = @import("object.zig");
 
 pub const Number = f64;
-const ValueType = enum { number, boolean, obj, nil };
+pub const ValueType = enum { number, boolean, obj, nil };
 pub const Value = union(ValueType) { number: Number, boolean: bool, obj: *objects.Obj, nil };
 pub const ValueArray = std.ArrayList(Value);
 
 pub fn is_number(v: Value) bool {
-    return switch (v) {
-        .number => true,
-        else => false,
-    };
+    return @as(ValueType, v) == .number;
 }
 
 pub fn is_bool(v: Value) bool {
-    return switch (v) {
-        .boolean => true,
-        else => false,
-    };
+    return @as(ValueType, v) == .boolean;
 }
 
 pub fn as_number(v: Value) f64 {
@@ -42,6 +36,10 @@ pub fn is_string(v: Value) bool {
     return is_object(v) and v.obj.is_string();
 }
 
+pub fn is_nil(v: Value) bool {
+    return @as(ValueType, v) == .nil;
+}
+
 fn value_type(v: Value) ValueType {
     return switch (v) {
         .boolean => .boolean,
@@ -57,12 +55,7 @@ pub fn values_equal(v1: Value, v2: Value) bool {
         .boolean => as_bool(v1) == as_bool(v2),
         .nil => true,
         .number => as_number(v1) == as_number(v2),
-        .obj => blk: {
-            const s1 = v1.obj.as_string();
-            const s2 = v2.obj.as_string();
-            const ok = std.mem.eql(u8, s1.*.str, s2.*.str);
-            break :blk ok;
-        },
+        .obj => v1.obj.as_string() == v2.obj.as_string(),
     };
 }
 

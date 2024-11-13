@@ -2,6 +2,7 @@ const std = @import("std");
 const common = @import("common.zig");
 const vals = @import("values.zig");
 const obj = @import("object.zig");
+const table = @import("table.zig");
 const Compiler = @import("compiler.zig").Compiler;
 const assert = std.debug.assert;
 
@@ -15,11 +16,14 @@ pub const VM = struct {
     stack_top: usize = 0, // TODO: Tried to use a pointer here but it gets copied when init() returns and points to an invalid address ..
     allocator: std.mem.Allocator,
     objects: ?*obj.Obj = null,
+    strings: table.Table,
 
     pub fn init(allocator: std.mem.Allocator) VM {
-        return VM{ .allocator = allocator };
+        return VM{ .allocator = allocator, .strings = table.Table.init(allocator) };
     }
     pub fn deinit(self: *VM) void {
+        self.strings.deinit();
+
         var current = self.objects;
         while (current != null) {
             const next = current.?.next;
