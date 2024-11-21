@@ -28,6 +28,13 @@ pub fn as_bool(v: Value) bool {
     };
 }
 
+pub fn as_obj(v: Value) *objects.Obj {
+    return switch (v) {
+        .obj => v.obj,
+        else => undefined,
+    };
+}
+
 pub fn is_object(v: Value) bool {
     return @as(ValueType, v) == .obj;
 }
@@ -60,7 +67,7 @@ pub fn values_equal(v1: Value, v2: Value) bool {
 }
 
 fn print_string(s: objects.Obj.String) void {
-    std.debug.print("\"{s}\"", .{s.str});
+    std.debug.print("{s}", .{s.str});
 }
 
 pub fn print_value(v: Value) void {

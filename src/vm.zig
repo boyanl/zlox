@@ -17,12 +17,14 @@ pub const VM = struct {
     allocator: std.mem.Allocator,
     objects: ?*obj.Obj = null,
     strings: table.Table,
+    globals: table.Table,
 
     pub fn init(allocator: std.mem.Allocator) VM {
-        return VM{ .allocator = allocator, .strings = table.Table.init(allocator) };
+        return VM{ .allocator = allocator, .strings = table.Table.init(allocator), .globals = table.Table.init(allocator) };
     }
     pub fn deinit(self: *VM) void {
         self.strings.deinit();
+        self.globals.deinit();
 
         var current = self.objects;
         while (current != null) {
@@ -55,6 +57,10 @@ pub const VM = struct {
         return self.chunk.?.constants.items[self.read_byte()];
     }
 
+    fn read_string(self: *VM) *obj.Obj.String {
+        return vals.as_obj(self.read_constant()).as_string();
+    }
+
     fn reset_stack(self: *VM) void {
         self.stack_top = 0;
     }
@@ -81,7 +87,7 @@ pub const VM = struct {
 
         const instr = self.ip - 1;
         const line = self.chunk.?.get_line(instr);
-        std.debug.print("[line {d}] in script", .{line});
+        std.debug.print("[line {d}] in script\n", .{line});
         self.reset_stack();
     }
 
@@ -135,8 +141,6 @@ pub const VM = struct {
             const instruction: common.InstructionType = @enumFromInt(self.read_byte());
             switch (instruction) {
                 .OP_RETURN => {
-                    vals.print_value(self.pop());
-                    std.debug.print("\n", .{});
                     return .OK;
                 },
                 .OP_CONSTANT => {
@@ -175,6 +179,34 @@ pub const VM = struct {
                     const b = self.pop();
                     const a = self.pop();
                     self.push(.{ .boolean = vals.values_equal(a, b) });
+                },
+
+                .OP_PRINT => {
+                    vals.print_value(self.pop());
+                    std.debug.print("\n", .{});
+                },
+                .OP_POP => _ = self.pop(),
+                .OP_DEFINE_GLOBAL => {
+                    const var_name = self.read_string();
+                    _ = self.globals.set(var_name, self.peek(0));
+                    _ = self.pop();
+                },
+                .OP_GET_GLOBAL => {
+                    const var_name = self.read_string();
+                    var val: vals.Value = undefined;
+                    if (!self.globals.get(var_name, &val)) {
+                        self.runtime_error("Undefined variable: '{s}'", .{var_name.str});
+                        return .RUNTIME_ERROR;
+                    }
+                    self.push(val);
+                },
+                .OP_SET_GLOBAL => {
+                    const var_name = self.read_string();
+                    if (self.globals.set(var_name, self.peek(0))) {
+                        _ = self.globals.delete(var_name);
+                        self.runtime_error("Variable '{s}' is not defined", .{var_name.str});
+                        return .RUNTIME_ERROR;
+                    }
                 },
             }
         }

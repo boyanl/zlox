@@ -17,6 +17,11 @@ pub const InstructionType = enum(u8) {
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
+    OP_PRINT,
+    OP_POP,
+    OP_DEFINE_GLOBAL,
+    OP_GET_GLOBAL,
+    OP_SET_GLOBAL,
 };
 pub const LineNumber = u24;
 pub const LineRun = packed struct { cnt: u8, line: LineNumber };
@@ -107,6 +112,11 @@ pub fn disassemble_instruction(chunk: Chunk, offset: usize) usize {
         .OP_EQUAL => simple_instruction("OP_EQUAL", offset),
         .OP_GREATER => simple_instruction("OP_GREATER", offset),
         .OP_LESS => simple_instruction("OP_LESS", offset),
+        .OP_PRINT => simple_instruction("OP_PRINT", offset),
+        .OP_POP => simple_instruction("OP_POP", offset),
+        .OP_DEFINE_GLOBAL => constant_instruction("OP_DEFINE_GLOBAL", chunk, offset),
+        .OP_GET_GLOBAL => constant_instruction("OP_GET_GLOBAL", chunk, offset),
+        .OP_SET_GLOBAL => constant_instruction("OP_SET_GLOBAL", chunk, offset),
     };
 }
 

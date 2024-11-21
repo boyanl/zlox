@@ -28,7 +28,7 @@ const Precedence = enum(u8) {
     PRIMARY,
 };
 
-const ParseFn = *const fn (p: *Compiler) void;
+const ParseFn = *const fn (p: *Compiler, can_assign: bool) void;
 
 const ParseRule = struct {
     prefix: ?ParseFn,
@@ -58,6 +58,7 @@ const rules = init: {
     arr[@intFromEnum(t.LESS)] = .{ .prefix = null, .infix = Compiler.binary, .precedence = .COMPARISON };
     arr[@intFromEnum(t.LESS_EQUAL)] = .{ .prefix = null, .infix = Compiler.binary, .precedence = .COMPARISON };
     arr[@intFromEnum(t.STRING)] = .{ .prefix = Compiler.string, .infix = null, .precedence = .NONE };
+    arr[@intFromEnum(t.IDENTIFIER)] = .{ .prefix = Compiler.variable, .infix = null, .precedence = .NONE };
 
     break :init arr;
 };
@@ -85,8 +86,9 @@ pub const Compiler = struct {
         self.current_chunk = chunk;
 
         self.advance();
-        self.expression();
-        self.consume(.EOF, "Expected end after expression.");
+        while (!self.match(.EOF)) {
+            self.declaration();
+        }
 
         self.end_compiler();
         return !self.parser.had_error; // TODO: Use errors for this instead of returning a boolean?
@@ -103,7 +105,26 @@ pub const Compiler = struct {
         }
     }
 
-    fn grouping(self: *Compiler) void {
+    fn match(self: *Compiler, t: s.Token.Type) bool {
+        if (!self.check(t)) return false;
+        self.advance();
+        return true;
+    }
+
+    fn check(self: *Compiler, t: s.Token.Type) bool {
+        return self.parser.current.type == t;
+    }
+
+    fn consume(self: *Compiler, token_type: s.Token.Type, msg: []const u8) void {
+        if (self.parser.current.type == token_type) {
+            self.advance();
+            return;
+        }
+
+        self.error_at_current(msg);
+    }
+
+    fn grouping(self: *Compiler, _: bool) void {
         self.expression();
         self.consume(.RIGHT_PAREN, "Expect ')' after expression");
     }
@@ -112,7 +133,7 @@ pub const Compiler = struct {
         self.parse_precedence(.ASSIGNMENT);
     }
 
-    fn number(self: *Compiler) void {
+    fn number(self: *Compiler, _: bool) void {
         const val = std.fmt.parseFloat(vals.Number, self.parser.previous.lexeme) catch {
             self.error_at_prev("Can't parse number");
             return;
@@ -120,7 +141,7 @@ pub const Compiler = struct {
         self.emit_constant(vals.Value{ .number = val });
     }
 
-    fn unary(self: *Compiler) void {
+    fn unary(self: *Compiler, _: bool) void {
         const opType = self.parser.previous.type;
         self.parse_precedence(.UNARY);
 
@@ -131,7 +152,7 @@ pub const Compiler = struct {
         }
     }
 
-    fn binary(self: *Compiler) void {
+    fn binary(self: *Compiler, _: bool) void {
         const opType = self.parser.previous.type;
         const rule = get_rule(opType);
 
@@ -153,7 +174,7 @@ pub const Compiler = struct {
         }
     }
 
-    fn literal(self: *Compiler) void {
+    fn literal(self: *Compiler, _: bool) void {
         switch (self.parser.previous.type) {
             .TRUE => self.emit_instruction(.OP_TRUE),
             .FALSE => self.emit_instruction(.OP_FALSE),
@@ -162,18 +183,105 @@ pub const Compiler = struct {
         }
     }
 
-    fn string(self: *Compiler) void {
+    fn string(self: *Compiler, _: bool) void {
         const source = self.parser.previous.lexeme[1 .. self.parser.previous.lexeme.len - 1];
         const str = objs.copy_string(source, self.vm) catch null; // TODO: Handle allocation errors?
         self.emit_constant(vals.Value{ .obj = str.?.as_obj() });
     }
 
+    fn variable(self: *Compiler, can_assign: bool) void {
+        self.named_variable(self.parser.previous, can_assign);
+    }
+
+    fn named_variable(self: *Compiler, name: s.Token, can_assign: bool) void {
+        const idx = self.identifier_constant(&name);
+
+        if (can_assign and self.match(.EQUAL)) {
+            self.expression();
+            self.emit_instruction(.OP_SET_GLOBAL);
+            self.emit_byte(idx);
+        } else {
+            self.emit_instruction(.OP_GET_GLOBAL);
+            self.emit_byte(idx);
+        }
+    }
+
+    fn declaration(self: *Compiler) void {
+        if (self.match(.VAR)) {
+            self.var_declaration();
+        } else {
+            self.statement();
+        }
+
+        if (self.parser.panic_mode) {
+            self.synchronize();
+        }
+    }
+
+    fn var_declaration(self: *Compiler) void {
+        const global = self.parse_variable("Expect identifier after var");
+
+        if (self.match(.EQUAL)) {
+            self.expression();
+        } else {
+            self.emit_instruction(.OP_NIL);
+        }
+
+        self.consume(.SEMICOLON, "Expect ';' after variable declaration");
+        self.emit_instruction(.OP_DEFINE_GLOBAL);
+        self.emit_byte(global);
+    }
+
+    fn parse_variable(self: *Compiler, error_msg: []const u8) u8 {
+        self.consume(.IDENTIFIER, error_msg);
+        return self.identifier_constant(&self.parser.previous);
+    }
+
+    fn identifier_constant(self: *Compiler, token: *const s.Token) u8 {
+        const str = objs.copy_string(token.lexeme, self.vm) catch null; // TODO: Error handling
+        return self.make_constant(vals.Value{ .obj = str.?.as_obj() });
+    }
+
+    fn synchronize(self: *Compiler) void {
+        self.parser.panic_mode = false;
+
+        while (self.parser.current.type != .EOF) {
+            if (self.parser.previous.type == .SEMICOLON) break;
+            switch (self.parser.current.type) {
+                .IF, .FOR, .PRINT, .RETURN, .WHILE, .CLASS, .FUN, .VAR, .BREAK => break,
+                else => {},
+            }
+            self.advance();
+        }
+    }
+
+    fn statement(self: *Compiler) void {
+        if (self.match(.PRINT)) {
+            self.print_statement();
+        } else {
+            self.expression_statement();
+        }
+    }
+
+    fn print_statement(self: *Compiler) void {
+        self.expression();
+        self.emit_instruction(.OP_PRINT);
+        self.consume(.SEMICOLON, "Expected ';' after statement");
+    }
+
+    fn expression_statement(self: *Compiler) void {
+        self.expression();
+        self.emit_instruction(.OP_POP);
+        self.consume(.SEMICOLON, "Expected ';' after statement");
+    }
+
     fn parse_precedence(self: *Compiler, p: Precedence) void {
         self.advance();
+        const can_assign = @intFromEnum(p) <= @intFromEnum(Precedence.ASSIGNMENT);
         const prefix_rule = get_rule(self.parser.previous.type).prefix;
 
         if (prefix_rule) |f| {
-            f(self);
+            f(self, can_assign);
         } else {
             self.error_at_prev("Expected expression");
             return;
@@ -183,11 +291,15 @@ pub const Compiler = struct {
             self.advance();
             const infix_rule = get_rule(self.parser.previous.type).infix;
             if (infix_rule) |f| {
-                f(self);
+                f(self, can_assign);
             } else {
                 self.error_at_prev("No infix rule lul");
                 return;
             }
+        }
+
+        if (can_assign and self.match(.EQUAL)) {
+            self.error_at_prev("Invalid assignment target");
         }
     }
 
@@ -220,15 +332,6 @@ pub const Compiler = struct {
         try stderr.print(": {s}\n", .{msg});
 
         self.parser.had_error = true;
-    }
-
-    fn consume(self: *Compiler, token_type: s.Token.Type, msg: []const u8) void {
-        if (self.parser.current.type == token_type) {
-            self.advance();
-            return;
-        }
-
-        self.error_at_current(msg);
     }
 
     fn emit_byte(self: *Compiler, b: u8) void {
