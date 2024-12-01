@@ -208,6 +208,14 @@ pub const VM = struct {
                         return .RUNTIME_ERROR;
                     }
                 },
+                .OP_GET_LOCAL => {
+                    const idx = self.read_byte();
+                    self.push(self.stack[idx]);
+                },
+                .OP_SET_LOCAL => {
+                    const idx = self.read_byte();
+                    self.stack[idx] = self.peek(0);
+                },
             }
         }
     }

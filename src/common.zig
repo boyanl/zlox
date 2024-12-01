@@ -22,6 +22,8 @@ pub const InstructionType = enum(u8) {
     OP_DEFINE_GLOBAL,
     OP_GET_GLOBAL,
     OP_SET_GLOBAL,
+    OP_GET_LOCAL,
+    OP_SET_LOCAL,
 };
 pub const LineNumber = u24;
 pub const LineRun = packed struct { cnt: u8, line: LineNumber };
@@ -117,6 +119,8 @@ pub fn disassemble_instruction(chunk: Chunk, offset: usize) usize {
         .OP_DEFINE_GLOBAL => constant_instruction("OP_DEFINE_GLOBAL", chunk, offset),
         .OP_GET_GLOBAL => constant_instruction("OP_GET_GLOBAL", chunk, offset),
         .OP_SET_GLOBAL => constant_instruction("OP_SET_GLOBAL", chunk, offset),
+        .OP_GET_LOCAL => byte_instruction("OP_GET_LOCAL", chunk, offset),
+        .OP_SET_LOCAL => byte_instruction("OP_SET_LOCAL", chunk, offset),
     };
 }
 
@@ -132,4 +136,9 @@ fn constant_instruction(name: []const u8, chunk: Chunk, offset: usize) usize {
 fn simple_instruction(name: []const u8, offset: usize) usize {
     std.debug.print("{s}\n", .{name});
     return offset + 1;
+}
+
+fn byte_instruction(name: []const u8, chunk: Chunk, offset: usize) usize {
+    std.debug.print("{s:<16} {d:>4}\n", .{ name, chunk.code.items[offset + 1] });
+    return offset + 2;
 }
