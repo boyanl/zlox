@@ -24,6 +24,7 @@ pub const InstructionType = enum(u8) {
     OP_SET_GLOBAL,
     OP_GET_LOCAL,
     OP_SET_LOCAL,
+    OP_JUMP_IF_FALSE,
 };
 pub const LineNumber = u24;
 pub const LineRun = packed struct { cnt: u8, line: LineNumber };
@@ -121,6 +122,7 @@ pub fn disassemble_instruction(chunk: Chunk, offset: usize) usize {
         .OP_SET_GLOBAL => constant_instruction("OP_SET_GLOBAL", chunk, offset),
         .OP_GET_LOCAL => byte_instruction("OP_GET_LOCAL", chunk, offset),
         .OP_SET_LOCAL => byte_instruction("OP_SET_LOCAL", chunk, offset),
+        .OP_JUMP_IF_FALSE => jump_instruction("OP_JUMP_IF_FALSE", chunk, 1, offset),
     };
 }
 
@@ -141,4 +143,16 @@ fn simple_instruction(name: []const u8, offset: usize) usize {
 fn byte_instruction(name: []const u8, chunk: Chunk, offset: usize) usize {
     std.debug.print("{s:<16} {d:>4}\n", .{ name, chunk.code.items[offset + 1] });
     return offset + 2;
+}
+
+fn jump_instruction(name: []const u8, chunk: Chunk, sign: i32, offset: usize) usize {
+    const jump_offset: u16 = make_short(chunk.code.items[offset + 1], chunk.code.items[offset + 2]);
+    const signed_jump = sign * @as(i32, @intCast(jump_offset));
+    std.debug.print("{s:<16} {d:>4}\n", .{ name, signed_jump });
+
+    return offset + 3;
+}
+
+fn make_short(b1: u8, b2: u8) u16 {
+    return (@as(u16, b1) << 8) | @as(u16, b2);
 }

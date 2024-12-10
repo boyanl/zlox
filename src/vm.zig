@@ -53,6 +53,14 @@ pub const VM = struct {
         return old;
     }
 
+    fn read_short(self: *VM) u16 {
+        const b1 = @as(u16, self.chunk.?.code.items[self.ip]);
+        const b2 = @as(u16, self.chunk.?.code.items[self.ip + 1]);
+        self.ip += 2;
+
+        return (b1 << 8) | b2;
+    }
+
     fn read_constant(self: *VM) vals.Value {
         return self.chunk.?.constants.items[self.read_byte()];
     }
@@ -215,6 +223,13 @@ pub const VM = struct {
                 .OP_SET_LOCAL => {
                     const idx = self.read_byte();
                     self.stack[idx] = self.peek(0);
+                },
+                .OP_JUMP_IF_FALSE => {
+                    const offset = self.read_short();
+
+                    if (is_falsey(self.peek(0))) {
+                        self.ip += offset;
+                    }
                 },
             }
         }

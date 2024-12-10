@@ -349,6 +349,8 @@ pub const Compiler = struct {
             self.begin_scope();
             self.block();
             self.end_scope();
+        } else if (self.match(.IF)) {
+            self.if_statement();
         } else {
             self.expression_statement();
         }
@@ -385,6 +387,17 @@ pub const Compiler = struct {
             self.emit_instruction(.OP_POP);
             self.locals_cnt -= 1;
         }
+    }
+
+    fn if_statement(self: *Compiler) void {
+        self.consume(.LEFT_PAREN, "Expected '(' after if");
+        self.expression();
+        self.consume(.RIGHT_PAREN, "Expected ')' after if condition");
+
+        const elseJump = self.emit_jump(.OP_JUMP_IF_FALSE);
+        self.statement();
+
+        self.patch_jump(elseJump);
     }
 
     fn parse_precedence(self: *Compiler, p: Precedence) void {
@@ -470,6 +483,21 @@ pub const Compiler = struct {
 
     fn emit_constant(self: *Compiler, v: vals.Value) void {
         self.emit_bytes(@intFromEnum(common.InstructionType.OP_CONSTANT), self.make_constant(v));
+    }
+
+    fn emit_jump(self: *Compiler, t: common.InstructionType) usize {
+        self.emit_instruction(t);
+        self.emit_bytes(0xff, 0xff);
+
+        return self.current_chunk.?.code.items.len - 2;
+    }
+
+    fn patch_jump(self: *Compiler, offset: usize) void {
+        const to_jump: usize = self.current_chunk.?.code.items.len - offset - 2; // -2 since we don't need to "jump" over the bytes for the offset (they're read anyway)
+
+        // TODO: Handle case when to_jump does not fit it u16
+        self.current_chunk.?.code.items[offset] = @intCast((to_jump >> 8) & 0xff);
+        self.current_chunk.?.code.items[offset + 1] = @intCast(to_jump & 0xff);
     }
 
     fn make_constant(self: *Compiler, v: vals.Value) u8 {
