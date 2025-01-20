@@ -1,4 +1,6 @@
 var a = 5;
-if (false) {
+if (true) {
   print a;
+} else {
+  print "False man";
 }

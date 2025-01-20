@@ -394,9 +394,15 @@ pub const Compiler = struct {
         self.expression();
         self.consume(.RIGHT_PAREN, "Expected ')' after if condition");
 
-        const elseJump = self.emit_jump(.OP_JUMP_IF_FALSE);
+        const thenJump = self.emit_jump(.OP_JUMP_IF_FALSE);
+        self.emit_instruction(.OP_POP);
         self.statement();
 
+        const elseJump = self.emit_jump(.OP_JUMP);
+        self.patch_jump(thenJump);
+
+        self.emit_instruction(.OP_POP);
+        if (self.match(.ELSE)) self.statement();
         self.patch_jump(elseJump);
     }
 

@@ -231,6 +231,10 @@ pub const VM = struct {
                         self.ip += offset;
                     }
                 },
+                .OP_JUMP => {
+                    const offset = self.read_short();
+                    self.ip += offset;
+                },
             }
         }
     }
