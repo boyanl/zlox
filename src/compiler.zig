@@ -59,6 +59,8 @@ const rules = init: {
     arr[@intFromEnum(t.LESS_EQUAL)] = .{ .prefix = null, .infix = Compiler.binary, .precedence = .COMPARISON };
     arr[@intFromEnum(t.STRING)] = .{ .prefix = Compiler.string, .infix = null, .precedence = .NONE };
     arr[@intFromEnum(t.IDENTIFIER)] = .{ .prefix = Compiler.variable, .infix = null, .precedence = .NONE };
+    arr[@intFromEnum(t.AND)] = .{ .prefix = null, .infix = Compiler.and_, .precedence = .AND };
+    arr[@intFromEnum(t.OR)] = .{ .prefix = null, .infix = Compiler.or_, .precedence = .OR };
 
     break :init arr;
 };
@@ -201,6 +203,27 @@ pub const Compiler = struct {
         const source = self.parser.previous.lexeme[1 .. self.parser.previous.lexeme.len - 1];
         const str = objs.copy_string(source, self.vm) catch null; // TODO: Handle allocation errors?
         self.emit_constant(vals.Value{ .obj = str.?.as_obj() });
+    }
+
+    fn and_(self: *Compiler, _: bool) void {
+        const elseJump = self.emit_jump(.OP_JUMP_IF_FALSE);
+
+        self.emit_instruction(.OP_POP);
+        self.parse_precedence(.AND);
+
+        self.patch_jump(elseJump);
+    }
+
+    fn or_(self: *Compiler, _: bool) void {
+        const jump = self.emit_jump(.OP_JUMP_IF_FALSE);
+        const elseJump = self.emit_jump(.OP_JUMP);
+
+        self.patch_jump(jump);
+
+        self.emit_instruction(.OP_POP);
+        self.parse_precedence(.OR);
+
+        self.patch_jump(elseJump);
     }
 
     fn variable(self: *Compiler, can_assign: bool) void {

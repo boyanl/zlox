@@ -1,6 +1,7 @@
 var a = 5;
-if (true) {
-  print a;
-} else {
-  print "False man";
-}
+
+print(a and 10);
+print(false and 10);
+print(false or 5);
+print(5 or true);
+print(true or 10);
