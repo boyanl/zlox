@@ -374,6 +374,8 @@ pub const Compiler = struct {
             self.end_scope();
         } else if (self.match(.IF)) {
             self.if_statement();
+        } else if (self.match(.WHILE)) {
+            self.while_statement();
         } else {
             self.expression_statement();
         }
@@ -427,6 +429,21 @@ pub const Compiler = struct {
         self.emit_instruction(.OP_POP);
         if (self.match(.ELSE)) self.statement();
         self.patch_jump(elseJump);
+    }
+
+    fn while_statement(self: *Compiler) void {
+        const loopStart = self.current_chunk.?.code.items.len;
+        self.consume(.LEFT_PAREN, "Expected '(' after while");
+        self.expression();
+        self.consume(.RIGHT_PAREN, "Expected ')' after while condition");
+
+        const endJump = self.emit_jump(.OP_JUMP_IF_FALSE);
+        self.emit_instruction(.OP_POP);
+        self.statement();
+
+        self.emit_loop(loopStart);
+        self.patch_jump(endJump);
+        self.emit_instruction(.OP_POP);
     }
 
     fn parse_precedence(self: *Compiler, p: Precedence) void {
@@ -519,6 +536,15 @@ pub const Compiler = struct {
         self.emit_bytes(0xff, 0xff);
 
         return self.current_chunk.?.code.items.len - 2;
+    }
+
+    fn emit_loop(self: *Compiler, loop_start: usize) void {
+        self.emit_instruction(.OP_LOOP);
+        const to_jump = self.current_chunk.?.code.items.len - loop_start + 2;
+
+        // TODO: Handle case when to_jump does not fit it u16
+        self.emit_byte(@intCast((to_jump >> 8) & 0xff));
+        self.emit_byte(@intCast(to_jump & 0xff));
     }
 
     fn patch_jump(self: *Compiler, offset: usize) void {

@@ -26,6 +26,7 @@ pub const InstructionType = enum(u8) {
     OP_SET_LOCAL,
     OP_JUMP_IF_FALSE,
     OP_JUMP,
+    OP_LOOP,
 };
 pub const LineNumber = u24;
 pub const LineRun = packed struct { cnt: u8, line: LineNumber };
@@ -125,6 +126,7 @@ pub fn disassemble_instruction(chunk: Chunk, offset: usize) usize {
         .OP_SET_LOCAL => byte_instruction("OP_SET_LOCAL", chunk, offset),
         .OP_JUMP_IF_FALSE => jump_instruction("OP_JUMP_IF_FALSE", chunk, 1, offset),
         .OP_JUMP => jump_instruction("OP_JUMP", chunk, 1, offset),
+        .OP_LOOP => jump_instruction("OP_LOOP", chunk, -1, offset),
     };
 }
 

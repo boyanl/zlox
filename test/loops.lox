@@ -1,0 +1,6 @@
+var a = 10;
+
+while (a < 2500) {
+  print(a);
+  a = 3*a + 1;
+}
